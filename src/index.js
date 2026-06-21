@@ -4,6 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import readline from 'node:readline';
 import { WebSocketServer } from 'ws';
+import OBSWebSocket from 'obs-websocket-js';
 
 import config from '../config.js';
 import { AtemController } from './atem.js';
@@ -30,12 +31,91 @@ function ask(rl, q) {
   return new Promise(resolve => rl.question(q, resolve));
 }
 
-async function promptObsCredentials(defaultAddress) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const addr = (await ask(rl, `  OBS WebSocket address [${defaultAddress}]: `)).trim() || defaultAddress;
-  const pass = (await ask(rl, '  OBS WebSocket password (leave blank if none): ')).trim();
-  rl.close();
-  return { addr, pass };
+async function askYesNo(rl, prompt) {
+  const ans = (await ask(rl, prompt)).trim().toLowerCase();
+  return ans === '' || ans === 'y' || ans === 'yes';
+}
+
+async function testObsConnect(address, password) {
+  const obs = new OBSWebSocket();
+  await Promise.race([
+    obs.connect(address, password || undefined),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), 5000))
+  ]);
+  try { obs.disconnect(); } catch {}
+}
+
+async function runSetup(rl, settings) {
+  const out = { ...settings };
+
+  // ── OBS ──────────────────────────────────────────────────────────────────
+  let obsConfigured = false;
+  if (settings.obsAddress) {
+    process.stdout.write(`\nOBS: ${settings.obsAddress}\n  Testing connection... `);
+    try {
+      await testObsConnect(settings.obsAddress, settings.obsPassword);
+      process.stdout.write('connected.\n');
+    } catch (err) {
+      process.stdout.write(`failed (${err.message}).\n`);
+    }
+    const keep = await askYesNo(rl, '  Keep this? [Y/n] ');
+    if (keep) obsConfigured = true;
+  }
+
+  if (!obsConfigured) {
+    console.log([
+      '',
+      'To enable the OBS WebSocket server:',
+      '  1. In OBS, open Tools → obs-websocket Settings',
+      '  2. Check "Enable WebSocket server"',
+      '  3. Set a password (recommended) and note the port (default: 4455)',
+    ].join('\n'));
+    const def = config.obs.address;
+    const addr = (await ask(rl, `\n  OBS WebSocket address [${def}]: `)).trim() || def;
+    const pass = (await ask(rl, '  Password (blank if none): ')).trim();
+    out.obsAddress = addr;
+    out.obsPassword = pass;
+  }
+
+  // ── ATEM IP ───────────────────────────────────────────────────────────────
+  let atemIp = null;
+  if (settings.atemIp) {
+    console.log(`\nATEM: ${settings.atemIp}`);
+    const keep = await askYesNo(rl, '  Keep this? [Y/n] ');
+    if (keep) atemIp = settings.atemIp;
+  }
+
+  if (!atemIp) {
+    console.log([
+      '',
+      'To find your ATEM\'s IP address:',
+      '  Connect the ATEM via USB and open the ATEM Setup software.',
+      '  The IP is shown on the main screen.',
+    ].join('\n'));
+    const ip = (await ask(rl, '\n  ATEM IP address: ')).trim();
+    if (ip) { atemIp = ip; out.atemIp = ip; }
+  }
+
+  // ── OBS HDMI input ────────────────────────────────────────────────────────
+  let obsInput = null;
+  if (settings.obsAtemInput != null) {
+    console.log(`\nOBS is on ATEM input: ${settings.obsAtemInput}`);
+    const keep = await askYesNo(rl, '  Keep this? [Y/n] ');
+    if (keep) obsInput = settings.obsAtemInput;
+  }
+
+  if (obsInput == null) {
+    console.log([
+      '',
+      'Which ATEM input number is your OBS machine connected to?',
+      '  (Usually 1, 2, 3... — check the physical cabling on your ATEM)',
+    ].join('\n'));
+    const num = (await ask(rl, '  Input number: ')).trim();
+    const n = parseInt(num, 10);
+    if (!isNaN(n)) { obsInput = n; out.obsAtemInput = n; }
+  }
+
+  return out;
 }
 
 function stamp(msg) {
@@ -43,7 +123,6 @@ function stamp(msg) {
 }
 
 async function main() {
-  
   console.log([
     '',
     '##########################',
@@ -55,17 +134,16 @@ async function main() {
 
   let settings = loadSettings();
 
-  if (settings.obsAddress === undefined) {
-    console.log('First run — enter your OBS WebSocket settings:');
-    const { addr, pass } = await promptObsCredentials(config.obs.address);
-    saveSettings({ obsAddress: addr, obsPassword: pass });
-    settings = loadSettings();
-    console.log(`\nSettings saved to ${SETTINGS_FILE}\n`);
-  }
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const newSettings = await runSetup(rl, settings);
+  rl.close();
+  saveSettings(newSettings);
+  settings = newSettings;
 
-  // Load the dock HTML: esbuild inlines it as a string at build time (--loader:.html=text).
-  // When running in dev with `node src/index.js`, the dynamic import fails (Node.js can't
-  // parse HTML as a module) and we fall back to reading from disk.
+  console.log('\nStarting server...\n');
+
+  // HTML: esbuild inlines as a string at build time (--loader:.html=text).
+  // Dev fallback: read from disk next to the entry point.
   let indexHtml;
   try {
     indexHtml = (await import('./index.html')).default;
@@ -81,8 +159,9 @@ async function main() {
 
   const obsAddr = settings.obsAddress || config.obs.address;
   const obsPass = settings.obsPassword ?? '';
-  const initialAtemIp = settings.atemIp || config.atem.ip;
+  const initialAtemIp = settings.atemIp;
 
+  if (settings.obsAtemInput != null) orch.setObsAtemInput(settings.obsAtemInput);
   if (initialAtemIp) atem.connect(initialAtemIp);
   obs.connect(obsAddr, obsPass).catch(() => {});
   orch.start();
@@ -126,18 +205,15 @@ async function main() {
       try { msg = JSON.parse(raw); } catch { return; }
       switch (msg.action) {
         case 'setFollowing':      orch.setFollowing(msg.value); break;
-        case 'setObsAtemInput':   orch.setObsAtemInput(msg.value); break;
         case 'setEndAction':      orch.setEndAction(msg.value); break;
         case 'setEndActionScene': orch.setEndActionScene(msg.value); break;
-        case 'setAtemIp':         orch.setAtemIp(msg.value); break;
       }
     });
   });
 
   server.listen(config.server.port, () => {
     console.log(`Dock UI:  http://127.0.0.1:${config.server.port}`);
-    console.log('Add this URL as a Custom Browser Dock in OBS (Docks → Custom Browser Docks)');
-    console.log('Find your ATEM\'s IP address in the ATEM Setup software, then enter it in the dock.\n');
+    console.log('Add this URL as a Custom Browser Dock in OBS (Docks → Custom Browser Docks)\n');
     console.log('Running. Close this window to stop.\n');
   });
 }

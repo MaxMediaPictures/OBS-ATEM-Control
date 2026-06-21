@@ -31,29 +31,6 @@ body {
   min-width: 220px;
 }
 
-/* ── Status bar ── */
-.status-bar {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  margin-bottom: 5px;
-}
-
-.status-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.status-dot.ok   { background: var(--ok);   box-shadow: 0 0 5px var(--ok); }
-.status-dot.warn { background: var(--warn); box-shadow: 0 0 5px var(--warn); }
-.status-dot.bad  { background: var(--bad); }
-
-.status-text { font-size: 11px; }
-
 /* ── Collapsible group ── */
 .group {
   border: 1px solid var(--border);
@@ -65,23 +42,28 @@ body {
 .group-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  gap: 7px;
+  padding: 6px 8px;
   background: var(--surface);
   cursor: pointer;
   user-select: none;
   font-size: 11px;
+}
+.group-title:hover { background: #2d2f3c; }
+
+.group-title .label {
   font-weight: 600;
   letter-spacing: .04em;
   color: var(--muted);
   text-transform: uppercase;
+  flex: 1;
 }
-.group-title:hover { background: #2d2f3c; }
 
 .chevron {
   display: inline-block;
   font-style: normal;
   font-size: 9px;
+  color: var(--muted);
   transition: transform .15s;
 }
 .group.open .chevron { transform: rotate(90deg); }
@@ -94,6 +76,38 @@ body {
 }
 .group.open .group-body { display: block; }
 
+/* ── Status dot ── */
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.ok   { background: var(--ok);   box-shadow: 0 0 5px var(--ok); }
+.status-dot.warn { background: var(--warn); box-shadow: 0 0 5px var(--warn); }
+.status-dot.bad  { background: var(--bad); }
+
+.status-text { font-size: 11px; flex: 1; }
+
+/* ── Detail rows inside status panel ── */
+.detail-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.detail-row:last-child { margin-bottom: 0; }
+.detail-row label { font-size: 11px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+.detail-value {
+  font-size: 11px;
+  color: var(--text);
+  text-align: right;
+  flex: 1;
+  word-break: break-all;
+}
+.detail-value.ok   { color: var(--ok); }
+.detail-value.warn { color: var(--warn); }
+.detail-value.bad  { color: var(--bad); }
+
 /* ── Rows ── */
 .row {
   display: flex;
@@ -105,8 +119,8 @@ body {
 .row:last-child { margin-bottom: 0; }
 .row label { font-size: 11px; color: var(--muted); white-space: nowrap; }
 
-/* ── Inputs & selects ── */
-input[type=text], select {
+/* ── Selects ── */
+select {
   background: var(--btn);
   color: var(--text);
   border: 1px solid var(--btn-border);
@@ -117,7 +131,7 @@ input[type=text], select {
   min-width: 0;
   flex: 1;
 }
-input[type=text]:focus, select:focus { border-color: var(--accent); }
+select:focus { border-color: var(--accent); }
 select:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ── Buttons ── */
@@ -134,13 +148,6 @@ button {
 }
 button:hover  { background: var(--btn-hover); }
 button:active { background: var(--btn-active); }
-
-button.primary {
-  background: var(--accent);
-  border-color: #2d5a9e;
-  color: #fff;
-}
-button.primary:hover { background: #4878c4; }
 
 #followBtn {
   min-width: 90px;
@@ -162,41 +169,28 @@ button.primary:hover { background: #4878c4; }
   margin-bottom: 5px;
 }
 
-/* ── Controls + countdown wrapper ── */
-.ctrl-wrap {
-  display: flex;
-  gap: 5px;
-  margin-bottom: 5px;
-  align-items: flex-start;
-}
-.ctrl-card { flex: 1; margin-bottom: 0; }
-
-
-/* ── Countdown card (separate component) ── */
+/* ── Countdown card ── */
 .cd-card {
   display: none;
-  flex-shrink: 0;
-  width: 76px;
-  margin-bottom: 0;
   text-align: center;
-  padding: 8px 6px;
+  padding: 10px 8px 8px;
 }
 .cd-card.visible { display: block; }
 
 #cdTime {
   display: block;
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 #cdDesc {
   font-size: 10px;
   color: var(--muted);
   line-height: 1.3;
-  margin-bottom: 6px;
+  margin-bottom: 7px;
 }
 
 .progress-track {
@@ -212,73 +206,57 @@ button.primary:hover { background: #4878c4; }
   transition: width .18s linear;
 }
 
-/* ── Log ── */
-.log {
-  font: 11px/1.4 ui-monospace, "Consolas", monospace;
-  color: var(--muted);
-  max-height: 72px;
-  overflow-y: auto;
-}
-.log-entry { padding: 1px 0; }
 </style>
 </head>
 <body>
 
-<!-- Status -->
-<div class="status-bar">
-  <div class="status-dot bad" id="statusDot"></div>
-  <span class="status-text" id="statusText">Connecting…</span>
+<!-- Countdown -->
+<div class="card cd-card" id="cdCard">
+  <span id="cdTime">0:00</span>
+  <div id="cdDesc"></div>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
 </div>
 
-<!-- Config (collapsed by default) -->
-<div class="group" id="configGroup">
-  <div class="group-title" id="configToggle">
-    <i class="chevron">▶</i>Configuration
+<!-- Status (collapsible detail panel) -->
+<div class="group" id="statusGroup">
+  <div class="group-title" id="statusToggle">
+    <div class="status-dot bad" id="statusDot"></div>
+    <span class="status-text" id="statusText">Connecting…</span>
+    <i class="chevron">▶</i>
   </div>
   <div class="group-body">
-    <div class="row">
-      <label>ATEM IP</label>
-      <input id="atemIp" type="text" inputmode="decimal" placeholder="192.168.1.240" style="max-width:110px" />
-      <button id="atemConnect" class="primary">Connect</button>
+    <div class="detail-row">
+      <label>OBS</label>
+      <span id="obsDetail" class="detail-value">—</span>
     </div>
-    <div class="row">
-      <label>OBS is input</label>
-      <select id="inputSel"><option value="">—</option></select>
+    <div class="detail-row">
+      <label>ATEM</label>
+      <span id="atemDetail" class="detail-value">—</span>
+    </div>
+    <div class="detail-row">
+      <label>OBS input</label>
+      <span id="inputDetail" class="detail-value">—</span>
     </div>
   </div>
 </div>
 
-<!-- Controls + Countdown (side by side, separate cards) -->
-<div class="ctrl-wrap">
-
-  <div class="card ctrl-card">
-    <div class="row">
-      <label>Follow ATEM</label>
-      <button id="followBtn">Paused</button>
-    </div>
-    <div class="row">
-      <label>When clip ends</label>
-      <select id="endAction">
-        <option value="__looping__" disabled>Looping video, no cue</option>
-        <option value="atem_cut_to_preview">ATEM cuts to preview</option>
-        <option value="obs_cut_to_preview">OBS cuts to preview</option>
-        <option value="nothing">Nothing</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="card cd-card" id="cdCard">
-    <span id="cdTime">0:00</span>
-    <div id="cdDesc"></div>
-    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-  </div>
-
-</div>
-
-<!-- Event log -->
+<!-- Controls -->
 <div class="card">
-  <div class="log" id="log"></div>
+  <div class="row">
+    <label>Follow ATEM</label>
+    <button id="followBtn" class="following">Following</button>
+  </div>
+  <div class="row">
+    <label>When clip ends</label>
+    <select id="endAction">
+      <option value="__looping__" disabled>Looping video</option>
+      <option value="atem_cut_to_preview">ATEM cuts to preview</option>
+      <option value="obs_cut_to_preview">OBS cuts to preview</option>
+      <option value="nothing">Nothing</option>
+    </select>
+  </div>
 </div>
+
 
 <script>
 const ws = new WebSocket(`ws://${location.host}`);
@@ -286,34 +264,13 @@ const $ = id => document.getElementById(id);
 
 function send(action, value) { ws.send(JSON.stringify({ action, value })); }
 
-$('configToggle').onclick = () => $('configGroup').classList.toggle('open');
-
-$('atemConnect').onclick = () => { const ip = $('atemIp').value.trim(); if (ip) send('setAtemIp', ip); };
-$('atemIp').addEventListener('keydown', e => { if (e.key === 'Enter') $('atemConnect').click(); });
+$('statusToggle').onclick = () => $('statusGroup').classList.toggle('open');
 
 let followState = false;
 $('followBtn').onclick = () => send('setFollowing', !followState);
 
-$('inputSel').onchange = e => send('setObsAtemInput', e.target.value);
 $('endAction').onchange = e => send('setEndAction', e.target.value);
 
-function log(line) {
-  const d = document.createElement('div');
-  d.className = 'log-entry';
-  d.textContent = `${new Date().toLocaleTimeString()}  ${line}`;
-  $('log').prepend(d);
-}
-
-function fillSelect(sel, items, value, getVal, getLabel, keepFirst) {
-  const cur = value ?? sel.value;
-  sel.innerHTML = keepFirst ? '<option value="">—</option>' : '';
-  for (const it of items) {
-    const o = document.createElement('option');
-    o.value = getVal(it); o.textContent = getLabel(it);
-    sel.appendChild(o);
-  }
-  if (cur != null) sel.value = String(cur);
-}
 
 function fmtTime(ms) {
   if (ms == null || ms < 0) return '—';
@@ -324,11 +281,11 @@ function fmtTime(ms) {
 
 ws.onmessage = ({ data }) => {
   const msg = JSON.parse(data);
-  if (msg.type === 'event') { log(JSON.stringify(msg.event)); return; }
+  if (msg.type === 'event') return;
   if (msg.type !== 'status') return;
   const s = msg.status;
 
-  // Status bar
+  // ── Status header ──
   const dot = $('statusDot'), txt = $('statusText');
   if (!s.obs.connected) {
     dot.className = 'status-dot bad'; txt.textContent = 'OBS not connected';
@@ -337,18 +294,28 @@ ws.onmessage = ({ data }) => {
   } else if (!s.obs.studioMode) {
     dot.className = 'status-dot warn'; txt.textContent = 'Enable Studio Mode in OBS';
   } else if (s.obsAtemInput == null) {
-    dot.className = 'status-dot warn'; txt.textContent = 'Select OBS HDMI input';
+    dot.className = 'status-dot warn'; txt.textContent = 'OBS input not configured';
   } else {
     dot.className = 'status-dot ok';
     txt.textContent = s.following ? 'Following ATEM' : 'Ready — paused';
   }
 
-  if (s.atem.ip && document.activeElement !== $('atemIp')) $('atemIp').value = s.atem.ip;
+  // ── Detail rows ──
+  const obsAddr = s.obs.address || '—';
+  const obsEl = $('obsDetail');
+  obsEl.textContent = obsAddr;
+  obsEl.className = 'detail-value ' + (s.obs.connected ? 'ok' : 'bad');
 
-  const hdmiInputs = s.atem.inputs.filter(i => (i.id >= 1 && i.id <= 8) || i.id === 6000);
-  fillSelect($('inputSel'), hdmiInputs, s.obsAtemInput,
-    i => i.id, i => `${i.id} — ${i.name}`, true);
+  const atemAddr = s.atem.ip || '—';
+  const atemEl = $('atemDetail');
+  atemEl.textContent = atemAddr;
+  atemEl.className = 'detail-value ' + (s.atem.connected ? 'ok' : (s.atem.ip ? 'bad' : ''));
 
+  const inp = s.atem.inputs?.find(i => i.id === s.obsAtemInput);
+  $('inputDetail').textContent = s.obsAtemInput == null ? '—'
+    : inp ? `${inp.id} — ${inp.name}` : String(s.obsAtemInput);
+
+  // ── Controls ──
   followState = s.following;
   $('followBtn').textContent = s.following ? 'Following' : 'Paused';
   $('followBtn').classList.toggle('following', s.following);
@@ -360,7 +327,8 @@ ws.onmessage = ({ data }) => {
     $('endAction').value    = s.endAction;
     $('endAction').disabled = false;
   }
-  // Countdown card — visible whenever playing; content changes on looping
+
+  // ── Countdown ──
   $('cdCard').classList.toggle('visible', !!s.playing);
   if (s.playing) {
     if (s.hasLooping) {

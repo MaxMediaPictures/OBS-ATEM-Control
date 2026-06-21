@@ -8,6 +8,7 @@ export class ObsController extends EventEmitter {
     super();
     this.obs = new OBSWebSocket();
     this.connected = false;
+    this.address = null;
     this.studioMode = false;
     this.scenes = [];
 
@@ -27,6 +28,7 @@ export class ObsController extends EventEmitter {
   }
 
   async connect(address, password) {
+    this.address = address;
     await this.obs.connect(address, password || undefined);
     this.connected = true;
     const sm = await this.obs.call('GetStudioModeEnabled');
@@ -110,6 +112,7 @@ export class ObsController extends EventEmitter {
   status() {
     return {
       connected: this.connected,
+      address: this.address,
       studioMode: this.studioMode,
       scenes: this.scenes
     };

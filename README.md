@@ -15,14 +15,21 @@ Pre-built binaries live in `dist/`. Double-click to launch:
 On Mac, double-clicking a raw binary in Finder won't open a terminal. Use
 `start.command` instead — double-click it and it opens in Terminal.app automatically.
 
-On first launch you'll be prompted for your OBS WebSocket address and password.
-Credentials are saved to `~/.obs-atem-control/settings.json` and reused on
-subsequent launches. To reconfigure, delete that file.
+Each launch opens a short setup wizard in the terminal:
+
+1. **OBS** — tests your existing OBS WebSocket connection (or walks you through
+   enabling it for the first time: Tools → obs-websocket Settings in OBS).
+2. **ATEM IP** — reuse the saved IP or enter a new one. Find it in the
+   **ATEM Setup** software (connect the ATEM via USB; the IP is on the main screen).
+3. **OBS input** — which ATEM input number your OBS machine is plugged into
+   (1, 2, 3…).
+
+Settings are saved to `~/.obs-atem-control/settings.json`. On subsequent
+launches just press Enter to keep all existing settings.
 
 Once running, add the dock URL in OBS: **Docks > Custom Browser Docks →
-`http://127.0.0.1:7790`**. Then type the ATEM's IP in the dock and click
-**Connect**. You can find the ATEM's IP address in the **ATEM Setup** software
-(it's listed on the main screen when the ATEM is connected via USB).
+`http://127.0.0.1:7790`**. Click the status row in the dock to expand it and
+see live connection details (OBS address, ATEM IP, input assignment).
 
 Close the terminal window to stop the app.
 
@@ -56,8 +63,9 @@ edit it and reload the browser without rebuilding.
 
 ## Configuration
 
-- **OBS credentials** — entered on first launch, saved to `~/.obs-atem-control/settings.json`.
-- **ATEM IP** — set from the dock UI; also saved to `settings.json`.
+- **OBS, ATEM IP, OBS input** — configured via the terminal wizard on each launch.
+  Settings are saved to `~/.obs-atem-control/settings.json`. Press Enter to
+  reuse saved values.
 - **Port / poll interval** — edit `config.js` (default port 7790, poll 200 ms).
 
 ## How it maps to the spec

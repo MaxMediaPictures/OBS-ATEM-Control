@@ -16,7 +16,7 @@ export class Orchestrator extends EventEmitter {
     this.config = config;
 
     // user-controlled settings (driven from the dock)
-    this.following = false;          // follow/pause toggle (#3)
+    this.following = true;            // follow/pause toggle (#3)
     this.obsAtemInput = null;        // which ATEM input is OBS (#2)
     this.endAction = END_ACTIONS.ATEM_CUT_TO_PREVIEW;
     this.endActionScene = null;      // scene X for OBS_GO_TO_SCENE
