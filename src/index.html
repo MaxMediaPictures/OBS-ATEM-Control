@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ATEM ⇄ OBS</title>
+<style>
+:root {
+  --bg:         #1e1f28;
+  --surface:    #252730;
+  --border:     #3a3c4a;
+  --text:       #eeeeee;
+  --muted:      #8a8c99;
+  --ok:         #4caf50;
+  --warn:       #e09b0e;
+  --bad:        #e05050;
+  --accent:     #3d6ab5;
+  --btn:        #2c2e3a;
+  --btn-border: #3e4050;
+  --btn-hover:  #353748;
+  --btn-active: #1e2028;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font: 12px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 6px;
+  min-width: 220px;
+}
+
+/* ── Status bar ── */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  margin-bottom: 5px;
+}
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.ok   { background: var(--ok);   box-shadow: 0 0 5px var(--ok); }
+.status-dot.warn { background: var(--warn); box-shadow: 0 0 5px var(--warn); }
+.status-dot.bad  { background: var(--bad); }
+
+.status-text { font-size: 11px; }
+
+/* ── Collapsible group ── */
+.group {
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  margin-bottom: 5px;
+  overflow: hidden;
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: var(--surface);
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.group-title:hover { background: #2d2f3c; }
+
+.chevron {
+  display: inline-block;
+  font-style: normal;
+  font-size: 9px;
+  transition: transform .15s;
+}
+.group.open .chevron { transform: rotate(90deg); }
+
+.group-body {
+  display: none;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.group.open .group-body { display: block; }
+
+/* ── Rows ── */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.row:last-child { margin-bottom: 0; }
+.row label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* ── Inputs & selects ── */
+input[type=text], select {
+  background: var(--btn);
+  color: var(--text);
+  border: 1px solid var(--btn-border);
+  border-radius: 2px;
+  padding: 3px 6px;
+  font: inherit;
+  outline: none;
+  min-width: 0;
+  flex: 1;
+}
+input[type=text]:focus, select:focus { border-color: var(--accent); }
+select:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── Buttons ── */
+button {
+  background: var(--btn);
+  color: var(--text);
+  border: 1px solid var(--btn-border);
+  border-radius: 2px;
+  padding: 4px 10px;
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  outline: none;
+}
+button:hover  { background: var(--btn-hover); }
+button:active { background: var(--btn-active); }
+
+button.primary {
+  background: var(--accent);
+  border-color: #2d5a9e;
+  color: #fff;
+}
+button.primary:hover { background: #4878c4; }
+
+#followBtn {
+  min-width: 90px;
+  font-weight: 600;
+  font-size: 11px;
+}
+#followBtn.following {
+  background: #1a3d20;
+  border-color: #2a6b35;
+  color: var(--ok);
+}
+
+/* ── Card ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 8px;
+  margin-bottom: 5px;
+}
+
+/* ── Controls + countdown wrapper ── */
+.ctrl-wrap {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 5px;
+  align-items: flex-start;
+}
+.ctrl-card { flex: 1; margin-bottom: 0; }
+
+
+/* ── Countdown card (separate component) ── */
+.cd-card {
+  display: none;
+  flex-shrink: 0;
+  width: 76px;
+  margin-bottom: 0;
+  text-align: center;
+  padding: 8px 6px;
+}
+.cd-card.visible { display: block; }
+
+#cdTime {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  margin-bottom: 5px;
+}
+
+#cdDesc {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+
+.progress-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width .18s linear;
+}
+
+/* ── Log ── */
+.log {
+  font: 11px/1.4 ui-monospace, "Consolas", monospace;
+  color: var(--muted);
+  max-height: 72px;
+  overflow-y: auto;
+}
+.log-entry { padding: 1px 0; }
+</style>
+</head>
+<body>
+
+<!-- Status -->
+<div class="status-bar">
+  <div class="status-dot bad" id="statusDot"></div>
+  <span class="status-text" id="statusText">Connecting…</span>
+</div>
+
+<!-- Config (collapsed by default) -->
+<div class="group" id="configGroup">
+  <div class="group-title" id="configToggle">
+    <i class="chevron">▶</i>Configuration
+  </div>
+  <div class="group-body">
+    <div class="row">
+      <label>ATEM IP</label>
+      <input id="atemIp" type="text" inputmode="decimal" placeholder="192.168.1.240" style="max-width:110px" />
+      <button id="atemConnect" class="primary">Connect</button>
+    </div>
+    <div class="row">
+      <label>OBS is input</label>
+      <select id="inputSel"><option value="">—</option></select>
+    </div>
+  </div>
+</div>
+
+<!-- Controls + Countdown (side by side, separate cards) -->
+<div class="ctrl-wrap">
+
+  <div class="card ctrl-card">
+    <div class="row">
+      <label>Follow ATEM</label>
+      <button id="followBtn">Paused</button>
+    </div>
+    <div class="row">
+      <label>When clip ends</label>
+      <select id="endAction">
+        <option value="__looping__" disabled>Looping video, no cue</option>
+        <option value="atem_cut_to_preview">ATEM cuts to preview</option>
+        <option value="obs_cut_to_preview">OBS cuts to preview</option>
+        <option value="nothing">Nothing</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card cd-card" id="cdCard">
+    <span id="cdTime">0:00</span>
+    <div id="cdDesc"></div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+</div>
+
+<!-- Event log -->
+<div class="card">
+  <div class="log" id="log"></div>
+</div>
+
+<script>
+const ws = new WebSocket(`ws://${location.host}`);
+const $ = id => document.getElementById(id);
+
+function send(action, value) { ws.send(JSON.stringify({ action, value })); }
+
+$('configToggle').onclick = () => $('configGroup').classList.toggle('open');
+
+$('atemConnect').onclick = () => { const ip = $('atemIp').value.trim(); if (ip) send('setAtemIp', ip); };
+$('atemIp').addEventListener('keydown', e => { if (e.key === 'Enter') $('atemConnect').click(); });
+
+let followState = false;
+$('followBtn').onclick = () => send('setFollowing', !followState);
+
+$('inputSel').onchange = e => send('setObsAtemInput', e.target.value);
+$('endAction').onchange = e => send('setEndAction', e.target.value);
+
+function log(line) {
+  const d = document.createElement('div');
+  d.className = 'log-entry';
+  d.textContent = `${new Date().toLocaleTimeString()}  ${line}`;
+  $('log').prepend(d);
+}
+
+function fillSelect(sel, items, value, getVal, getLabel, keepFirst) {
+  const cur = value ?? sel.value;
+  sel.innerHTML = keepFirst ? '<option value="">—</option>' : '';
+  for (const it of items) {
+    const o = document.createElement('option');
+    o.value = getVal(it); o.textContent = getLabel(it);
+    sel.appendChild(o);
+  }
+  if (cur != null) sel.value = String(cur);
+}
+
+function fmtTime(ms) {
+  if (ms == null || ms < 0) return '—';
+  const s = Math.ceil(ms / 1000);
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
+ws.onmessage = ({ data }) => {
+  const msg = JSON.parse(data);
+  if (msg.type === 'event') { log(JSON.stringify(msg.event)); return; }
+  if (msg.type !== 'status') return;
+  const s = msg.status;
+
+  // Status bar
+  const dot = $('statusDot'), txt = $('statusText');
+  if (!s.obs.connected) {
+    dot.className = 'status-dot bad'; txt.textContent = 'OBS not connected';
+  } else if (!s.atem.connected) {
+    dot.className = 'status-dot bad'; txt.textContent = 'ATEM not connected';
+  } else if (!s.obs.studioMode) {
+    dot.className = 'status-dot warn'; txt.textContent = 'Enable Studio Mode in OBS';
+  } else if (s.obsAtemInput == null) {
+    dot.className = 'status-dot warn'; txt.textContent = 'Select OBS HDMI input';
+  } else {
+    dot.className = 'status-dot ok';
+    txt.textContent = s.following ? 'Following ATEM' : 'Ready — paused';
+  }
+
+  if (s.atem.ip && document.activeElement !== $('atemIp')) $('atemIp').value = s.atem.ip;
+
+  const hdmiInputs = s.atem.inputs.filter(i => (i.id >= 1 && i.id <= 8) || i.id === 6000);
+  fillSelect($('inputSel'), hdmiInputs, s.obsAtemInput,
+    i => i.id, i => `${i.id} — ${i.name}`, true);
+
+  followState = s.following;
+  $('followBtn').textContent = s.following ? 'Following' : 'Paused';
+  $('followBtn').classList.toggle('following', s.following);
+
+  if (s.hasLooping) {
+    $('endAction').value    = '__looping__';
+    $('endAction').disabled = true;
+  } else {
+    $('endAction').value    = s.endAction;
+    $('endAction').disabled = false;
+  }
+  // Countdown card — visible whenever playing; content changes on looping
+  $('cdCard').classList.toggle('visible', !!s.playing);
+  if (s.playing) {
+    if (s.hasLooping) {
+      $('cdTime').textContent = '∞';
+      $('cdDesc').textContent = 'Looping';
+      $('progressFill').style.width = '100%';
+    } else if (s.endAction !== 'nothing' && s.media?.durationMs > 0) {
+      const rem = s.media.durationMs - s.media.cursorMs;
+      $('cdTime').textContent = fmtTime(rem);
+      $('cdDesc').textContent = s.endAction === 'atem_cut_to_preview'
+        ? '→ ATEM preview'
+        : '→ OBS preview';
+      const pct = Math.min(100, Math.max(0, s.media.cursorMs / s.media.durationMs * 100));
+      $('progressFill').style.width = (100 - pct) + '%';
+    } else {
+      $('cdTime').textContent = '—';
+      $('cdDesc').textContent = '';
+      $('progressFill').style.width = '0%';
+    }
+  }
+};
+
+ws.onclose = () => {
+  $('statusDot').className = 'status-dot bad';
+  $('statusText').textContent = 'Disconnected from orchestrator';
+};
+</script>
+</body>
+</html>

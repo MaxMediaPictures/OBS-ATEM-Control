@@ -1,0 +1,18 @@
+// config.js — edit to match your setup
+export default {
+  obs: {
+    address: 'ws://127.0.0.1:4455', // Localhost should be fine in most cases
+    password: '#####' // set if you enabled an obs-websocket password
+  },
+  atem: {
+    // Optional initial IP. The dock UI sets and persists the IP (settings.json),
+    // which takes precedence. Leave blank to set it entirely from the dock.
+    ip: ''
+  },
+  // Local web server the OBS dock points at
+  server: {
+    port: 7790
+  },
+  // How often (ms) to poll OBS media state for end-of-clip detection
+  pollIntervalMs: 200
+};
