@@ -5,13 +5,16 @@ import { EventEmitter } from 'node:events';
 export class AtemController extends EventEmitter {
   constructor() {
     super();
-    this.atem = new Atem();
+    // disableMultithreaded: threadedclass spawns a child process by file path, which
+    // fails inside a pkg binary (snapshot files aren't real paths on disk).
+    this.atem = new Atem({ disableMultithreaded: true });
     this.connected = false;
     this.ip = null;           // current target IP (set via connect)
     this.programInput = null; // current ME0 program source id
     this.inputs = [];         // [{id, name}]
 
     this.atem.on('connected', () => {
+      console.log('[atem] event: connected');
       this.connected = true;
       this._refreshInputs();
       this._refreshProgram();
@@ -19,6 +22,7 @@ export class AtemController extends EventEmitter {
     });
 
     this.atem.on('disconnected', () => {
+      console.log('[atem] event: disconnected');
       this.connected = false;
       this.emit('status');
     });
@@ -51,9 +55,12 @@ export class AtemController extends EventEmitter {
     }
     this.ip = ip;
     this.emit('status'); // reflect the new target immediately (shows "connecting")
+    console.log(`[atem] connecting to ${ip}...`);
     try {
       await this.atem.connect(ip);
+      console.log(`[atem] connect() resolved`);
     } catch (err) {
+      console.error(`[atem] connect() threw:`, err);
       this.connected = false;
       this.emit('status');
     }

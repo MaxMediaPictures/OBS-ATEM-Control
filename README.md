@@ -4,20 +4,61 @@ HyperDeck-style automation: when the ATEM cuts to OBS's HDMI input, OBS cuts its
 preview live; when the scene's longest non-looping clip ends, a configurable
 action fires (e.g. ATEM cuts to preview).
 
-## Setup
+## Running the standalone executable
 
-1. **OBS**: enable obs-websocket (Tools > WebSocket Server Settings). Note the
-   port (default 4455) and password.
-2. Create a `config.js` based on `config.js.example` — set `obs.password`.
-3. Install + run:
-   ```
-   npm install
-   npm start
-   ```
-4. In OBS: **Docks > Custom Browser Docks**, add
-   `http://127.0.0.1:7790` with any name. The panel appears inside OBS.
-5. In the dock, type the ATEM's IP and click **Connect**. The IP is saved to
-   `settings.json` and reused on the next start.
+Pre-built binaries live in `dist/`. Double-click to launch:
+
+- **Mac (Apple Silicon)**: `dist/obs-atem-control`
+- **Mac (Intel)**: `dist/obs-atem-control-x64`  
+- **Windows**: `dist/obs-atem-control.exe`
+
+On Mac, double-clicking a raw binary in Finder won't open a terminal. Use
+`start.command` instead — double-click it and it opens in Terminal.app automatically.
+
+On first launch you'll be prompted for your OBS WebSocket address and password.
+Credentials are saved to `~/.obs-atem-control/settings.json` and reused on
+subsequent launches. To reconfigure, delete that file.
+
+Once running, add the dock URL in OBS: **Docks > Custom Browser Docks →
+`http://127.0.0.1:7790`**. Then type the ATEM's IP in the dock and click
+**Connect**. You can find the ATEM's IP address in the **ATEM Setup** software
+(it's listed on the main screen when the ATEM is connected via USB).
+
+Close the terminal window to stop the app.
+
+## Building from source
+
+**Prerequisites**: Node.js 20+, then `npm install`.
+
+```bash
+# Mac (Apple Silicon)
+npm run dist:mac
+
+# Mac (Intel)
+npm run build && npm run package:mac-x64
+
+# Windows (cross-compile or run on Windows)
+npm run dist:win
+```
+
+Output lands in `dist/`. The first build downloads a ~80 MB Node.js binary for
+the target platform (one-time, cached by pkg).
+
+## Development mode
+
+```bash
+npm start
+```
+
+Runs `node src/index.js` directly — no build step needed. Same first-run prompt
+for OBS credentials. The dock UI is served live from `src/index.html` so you can
+edit it and reload the browser without rebuilding.
+
+## Configuration
+
+- **OBS credentials** — entered on first launch, saved to `~/.obs-atem-control/settings.json`.
+- **ATEM IP** — set from the dock UI; also saved to `settings.json`.
+- **Port / poll interval** — edit `config.js` (default port 7790, poll 200 ms).
 
 ## How it maps to the spec
 
