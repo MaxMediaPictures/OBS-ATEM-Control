@@ -1,6 +1,13 @@
 // src/orchestrator.js — the state machine wiring ATEM + OBS together.
 import { EventEmitter } from 'node:events';
 
+// Parse "(-Xs)" suffix from a scene name → milliseconds early cue (0 if absent).
+// e.g. "Interview (-3s)" → 3000, "B-Roll (-0.5s)" → 500, "Intro" → 0
+function parseEarlyCueMs(sceneName) {
+  const m = sceneName?.match(/\(-(\d+(?:\.\d+)?)s\)\s*$/);
+  return m ? parseFloat(m[1]) * 1000 : 0;
+}
+
 // End-of-video action choices exposed in the dock dropdown.
 export const END_ACTIONS = {
   ATEM_CUT_TO_PREVIEW: 'atem_cut_to_preview',
@@ -23,6 +30,8 @@ export class Orchestrator extends EventEmitter {
 
     // internal runtime state
     this._playing = false;           // OBS clip currently driving program
+    this._playingScene = null;       // scene we're currently tracking (null = not yet set)
+    this._seenPlaying = false;       // have we seen the clip in PLAYING state this session?
     this._endHandled = false;        // debounce so we only fire the end action once
     this._poll = null;
     this._lastMedia = null;          // { durationMs, cursorMs } from last tick
@@ -72,11 +81,15 @@ export class Orchestrator extends EventEmitter {
       // ATEM cut TO OBS — perform the OBS cut, send preview live, arm end-detection.
       await this.obs.cutPreviewToProgram();
       this._playing = true;
+      this._playingScene = null;
+      this._seenPlaying = false;
       this._endHandled = false;
       this.emit('event', { type: 'atem_cut_to_obs', input });
     } else {
       // ATEM moved away from OBS — clip playback no longer owns program.
       this._playing = false;
+      this._playingScene = null;
+      this._seenPlaying = false;
       this._hasLooping = false;
       this._lastMedia = null;
     }
@@ -87,6 +100,18 @@ export class Orchestrator extends EventEmitter {
     if (!this.following || !this.isReady() || !this._playing) return;
 
     const programScene = await this.obs.getProgramScene();
+
+    // If OBS manually cut to a different scene, re-arm on the new scene without firing.
+    if (this._playingScene !== null && programScene !== this._playingScene) {
+      this._playingScene = null;
+      this._seenPlaying = false;
+      this._endHandled = false;
+      this._hasLooping = false;
+      this._lastMedia = null;
+      this.emit('status');
+    }
+    if (this._playingScene === null) this._playingScene = programScene;
+
     const { hasLooping, longest } = await this.obs.getSceneMediaState(programScene);
 
     if (hasLooping !== this._hasLooping) {
@@ -98,12 +123,24 @@ export class Orchestrator extends EventEmitter {
     if (hasLooping) return;
     if (!longest) return;
 
-    this._lastMedia = { durationMs: longest.durationMs, cursorMs: longest.cursorMs };
+    // Track that we've seen the clip actually playing (guards against stale ENDED state
+    // on first tick after a scene change).
+    if (longest.state === 'OBS_MEDIA_STATE_PLAYING') this._seenPlaying = true;
+
+    const earlyMs = parseEarlyCueMs(programScene);
+    this._lastMedia = { durationMs: longest.durationMs, cursorMs: longest.cursorMs, earlyMs };
     this.emit('status');
 
-    if (longest.ended && !this._endHandled) {
+    const remaining = longest.durationMs - longest.cursorMs;
+    const shouldFire = this._seenPlaying && (
+      longest.ended || (earlyMs > 0 && longest.durationMs > 0 && remaining <= earlyMs)
+    );
+
+    if (shouldFire && !this._endHandled) {
       this._endHandled = true;
       this._playing = false;
+      this._playingScene = null;
+      this._seenPlaying = false;
       this._lastMedia = null;
       this._hasLooping = false;
       this.emit('status');

@@ -259,18 +259,14 @@ button:active { background: var(--btn-active); }
 
 
 <script>
-const ws = new WebSocket(`ws://${location.host}`);
 const $ = id => document.getElementById(id);
 
-function send(action, value) { ws.send(JSON.stringify({ action, value })); }
-
-$('statusToggle').onclick = () => $('statusGroup').classList.toggle('open');
-
+let ws;
 let followState = false;
-$('followBtn').onclick = () => send('setFollowing', !followState);
 
-$('endAction').onchange = e => send('setEndAction', e.target.value);
-
+function send(action, value) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action, value }));
+}
 
 function fmtTime(ms) {
   if (ms == null || ms < 0) return '—';
@@ -279,7 +275,7 @@ function fmtTime(ms) {
   return `${m}:${String(s % 60).padStart(2, '0')}`;
 }
 
-ws.onmessage = ({ data }) => {
+function onMessage({ data }) {
   const msg = JSON.parse(data);
   if (msg.type === 'event') return;
   if (msg.type !== 'status') return;
@@ -336,12 +332,14 @@ ws.onmessage = ({ data }) => {
       $('cdDesc').textContent = 'Looping';
       $('progressFill').style.width = '100%';
     } else if (s.endAction !== 'nothing' && s.media?.durationMs > 0) {
-      const rem = s.media.durationMs - s.media.cursorMs;
+      const earlyMs = s.media.earlyMs || 0;
+      const rem = Math.max(0, (s.media.durationMs - s.media.cursorMs) - earlyMs);
       $('cdTime').textContent = fmtTime(rem);
       $('cdDesc').textContent = s.endAction === 'atem_cut_to_preview'
         ? '→ ATEM preview'
         : '→ OBS preview';
-      const pct = Math.min(100, Math.max(0, s.media.cursorMs / s.media.durationMs * 100));
+      const effectiveDuration = s.media.durationMs - earlyMs;
+      const pct = Math.min(100, Math.max(0, s.media.cursorMs / effectiveDuration * 100));
       $('progressFill').style.width = (100 - pct) + '%';
     } else {
       $('cdTime').textContent = '—';
@@ -349,12 +347,24 @@ ws.onmessage = ({ data }) => {
       $('progressFill').style.width = '0%';
     }
   }
-};
+}
 
-ws.onclose = () => {
-  $('statusDot').className = 'status-dot bad';
-  $('statusText').textContent = 'Disconnected from orchestrator';
-};
+function wsConnect() {
+  ws = new WebSocket(`ws://${location.host}`);
+  ws.onmessage = onMessage;
+  ws.onclose = () => {
+    $('statusDot').className = 'status-dot bad';
+    $('statusText').textContent = 'Reconnecting…';
+    $('cdCard').classList.remove('visible');
+    setTimeout(wsConnect, 3000);
+  };
+}
+
+$('statusToggle').onclick = () => $('statusGroup').classList.toggle('open');
+$('followBtn').onclick = () => send('setFollowing', !followState);
+$('endAction').onchange = e => send('setEndAction', e.target.value);
+
+wsConnect();
 </script>
 </body>
 </html>

@@ -6,11 +6,12 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
+    "test": "node --test tests/*.test.js",
     "build": "esbuild src/index.js --bundle --platform=node --target=node20 --format=cjs --outfile=dist/bundle.cjs --external:bufferutil --external:utf-8-validate --alias:@julusian/freetype2=./shims/freetype2.cjs --alias:threadedclass=./shims/threadedclass.cjs --loader:.html=text",
     "package:mac": "pkg dist/bundle.cjs --targets node20-macos-arm64 --output dist/obs-atem-control",
     "package:mac-x64": "pkg dist/bundle.cjs --targets node20-macos-x64 --output dist/obs-atem-control-x64",
     "package:win": "pkg dist/bundle.cjs --targets node20-win-x64 --output dist/obs-atem-control.exe",
-    "dist:mac": "npm run build && npm run package:mac",
+    "dist:mac": "npm run build && npm run package:mac-x64 && cp start.command dist/start.command && chmod +x dist/start.command",
     "dist:win": "npm run build && npm run package:win"
   },
   "pkg": {

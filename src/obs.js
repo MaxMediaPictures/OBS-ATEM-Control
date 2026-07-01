@@ -9,12 +9,15 @@ export class ObsController extends EventEmitter {
     this.obs = new OBSWebSocket();
     this.connected = false;
     this.address = null;
+    this._password = undefined;
+    this._reconnectTimer = null;
     this.studioMode = false;
     this.scenes = [];
 
     this.obs.on('ConnectionClosed', () => {
       this.connected = false;
       this.emit('status');
+      this._scheduleReconnect();
     });
 
     this.obs.on('StudioModeStateChanged', ({ studioModeEnabled }) => {
@@ -27,14 +30,29 @@ export class ObsController extends EventEmitter {
     });
   }
 
+  _scheduleReconnect() {
+    if (this._reconnectTimer || !this.address) return;
+    this._reconnectTimer = setTimeout(() => {
+      this._reconnectTimer = null;
+      this.connect(this.address, this._password).catch(() => {});
+    }, 5000);
+  }
+
   async connect(address, password) {
+    if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
     this.address = address;
-    await this.obs.connect(address, password || undefined);
-    this.connected = true;
-    const sm = await this.obs.call('GetStudioModeEnabled');
-    this.studioMode = sm.studioModeEnabled;
-    await this._refreshScenes();
-    this.emit('status');
+    this._password = password || undefined;
+    try {
+      await this.obs.connect(address, this._password);
+      this.connected = true;
+      const sm = await this.obs.call('GetStudioModeEnabled');
+      this.studioMode = sm.studioModeEnabled;
+      await this._refreshScenes();
+      this.emit('status');
+    } catch (err) {
+      this._scheduleReconnect();
+      throw err;
+    }
   }
 
   async _refreshScenes() {

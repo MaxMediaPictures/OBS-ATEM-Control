@@ -6,14 +6,9 @@ action fires (e.g. ATEM cuts to preview).
 
 ## Running the standalone executable
 
-Pre-built binaries live in `dist/`. Double-click to launch:
-
-- **Mac (Apple Silicon)**: `dist/obs-atem-control`
-- **Mac (Intel)**: `dist/obs-atem-control-x64`  
-- **Windows**: `dist/obs-atem-control.exe`
-
-On Mac, double-clicking a raw binary in Finder won't open a terminal. Use
-`start.command` instead — double-click it and it opens in Terminal.app automatically.
+- **Mac**: double-click `dist/start.command` — it opens Terminal.app and runs the app.
+  (Double-clicking the binary directly won't work; macOS won't open a terminal for it.)
+- **Windows**: double-click `dist/obs-atem-control.exe`.
 
 Each launch opens a short setup wizard in the terminal:
 
@@ -81,6 +76,22 @@ edit it and reload the browser without rebuilding.
    - **ATEM cuts to preview** — ATEM auto (fade) to its preview bus.
    - **OBS goes to scene X** — sets a chosen OBS scene as program.
    - **Nothing**.
+
+## Early cue (audio fade before cut)
+
+Append `(-Xs)` to an OBS scene name to fire the end action X seconds before the
+clip finishes. This gives you time for audio to fade out before the ATEM cuts.
+
+Examples:
+
+| Scene name | Cue fires |
+|---|---|
+| `Interview` | at clip end |
+| `Interview (-3s)` | 3 s before clip end |
+| `B-Roll (-0.5s)` | 0.5 s before clip end |
+
+The countdown timer and progress bar in the dock reflect the adjusted time, so
+they hit zero exactly when the cue fires.
 
 ## Notes / things to tune
 

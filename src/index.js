@@ -5,6 +5,7 @@ import os from 'node:os';
 import readline from 'node:readline';
 import { WebSocketServer } from 'ws';
 import OBSWebSocket from 'obs-websocket-js';
+import { Atem } from 'atem-connection';
 
 import config from '../config.js';
 import { AtemController } from './atem.js';
@@ -45,24 +46,41 @@ async function testObsConnect(address, password) {
   try { obs.disconnect(); } catch {}
 }
 
+async function testAtemConnect(ip) {
+  const atem = new Atem({ disableMultithreaded: true });
+  try {
+    await Promise.race([
+      new Promise((resolve, reject) => {
+        atem.on('connected', resolve);
+        atem.connect(ip).catch(reject);
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timed out after 5s')), 5000))
+    ]);
+  } finally {
+    try { await atem.disconnect(); } catch {}
+  }
+}
+
 async function runSetup(rl, settings) {
   const out = { ...settings };
 
-  // ── OBS ──────────────────────────────────────────────────────────────────
-  let obsConfigured = false;
-  if (settings.obsAddress) {
-    process.stdout.write(`\nOBS: ${settings.obsAddress}\n  Testing connection... `);
-    try {
-      await testObsConnect(settings.obsAddress, settings.obsPassword);
-      process.stdout.write('connected.\n');
-    } catch (err) {
-      process.stdout.write(`failed (${err.message}).\n`);
+  // ── OBS ─────────────────────────────────────────────────────────────────
+  // Loop until we have a working OBS connection.
+  let obsAddress = settings.obsAddress;
+  let obsPassword = settings.obsPassword;
+  while (true) {
+    if (obsAddress) {
+      process.stdout.write(`\nOBS: ${obsAddress}\n  Testing connection... `);
+      try {
+        await testObsConnect(obsAddress, obsPassword);
+        process.stdout.write('connected.\n');
+        const keep = await askYesNo(rl, '  Keep this? [Y/n] ');
+        if (keep) { out.obsAddress = obsAddress; out.obsPassword = obsPassword; break; }
+      } catch (err) {
+        process.stdout.write(`failed (${err.message}).\n`);
+        console.log('  Cannot continue without an OBS connection. Please check your settings.');
+      }
     }
-    const keep = await askYesNo(rl, '  Keep this? [Y/n] ');
-    if (keep) obsConfigured = true;
-  }
-
-  if (!obsConfigured) {
     console.log([
       '',
       'To enable the OBS WebSocket server:',
@@ -71,21 +89,26 @@ async function runSetup(rl, settings) {
       '  3. Set a password (recommended) and note the port (default: 4455)',
     ].join('\n'));
     const def = config.obs.address;
-    const addr = (await ask(rl, `\n  OBS WebSocket address [${def}]: `)).trim() || def;
-    const pass = (await ask(rl, '  Password (blank if none): ')).trim();
-    out.obsAddress = addr;
-    out.obsPassword = pass;
+    obsAddress = (await ask(rl, `\n  OBS WebSocket address [${def}]: `)).trim() || def;
+    obsPassword = (await ask(rl, '  Password (blank if none): ')).trim();
   }
 
-  // ── ATEM IP ───────────────────────────────────────────────────────────────
-  let atemIp = null;
-  if (settings.atemIp) {
-    console.log(`\nATEM: ${settings.atemIp}`);
-    const keep = await askYesNo(rl, '  Keep this? [Y/n] ');
-    if (keep) atemIp = settings.atemIp;
-  }
-
-  if (!atemIp) {
+  // ── ATEM IP ──────────────────────────────────────────────────────────────
+  // Loop until we have a reachable ATEM.
+  let atemIp = settings.atemIp || null;
+  while (true) {
+    if (atemIp) {
+      process.stdout.write(`\nATEM: ${atemIp}\n  Testing connection... `);
+      try {
+        await testAtemConnect(atemIp);
+        process.stdout.write('connected.\n');
+        const keep = await askYesNo(rl, '  Keep this? [Y/n] ');
+        if (keep) { out.atemIp = atemIp; break; }
+      } catch (err) {
+        process.stdout.write(`failed (${err.message}).\n`);
+        console.log('  Cannot continue without an ATEM connection. Please check the IP address.');
+      }
+    }
     console.log([
       '',
       'To find your ATEM\'s IP address:',
